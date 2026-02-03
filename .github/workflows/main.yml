@@ -1,0 +1,43 @@
+name: Upstream Sync
+
+permissions:
+  contents: write
+
+on:
+  schedule:
+    - cron: "0 0 * * *" # 每天国际标准时间 0点（北京时间早上8点）执行一次
+  workflow_dispatch: # 允许你手动点击按钮触发
+
+jobs:
+  sync_latest_from_upstream:
+    name: Sync latest commits from upstream repo
+    runs-on: ubuntu-latest
+    if: ${{ github.event.repository.fork }} # 只有是 Fork 仓库才运行
+
+    steps:
+      # 第一步：检出代码
+      - name: Checkout target repo
+        uses: actions/checkout@v3
+
+      # 第二步：运行同步动作
+      - name: Sync upstream changes
+        id: sync
+        uses: aormsby/Fork-Sync-With-Upstream-action@v3.4
+        with:
+          upstream_sync_repo: su-kaka/gcli2api # 原作者仓库
+          upstream_sync_branch: main # 原仓库的主分支（如果原作者用master，请改为master）
+          target_sync_branch: main   # 你仓库的分支
+          target_repo_token: ${{ secrets.GITHUB_TOKEN }} # 自动生成的令牌，无需配置
+
+          # 设置为 false 表示如果上游有新提交，直接覆盖你的历史（保持完全一致）
+          # 设置为 true 表示尝试 git merge（如果你改过代码，建议用 true）
+          test_mode: false
+
+      # 第三步：检查是否有更新（可选，用于日志显示）
+      - name: New commits found
+        if: steps.sync.outputs.has_new_commits == 'true'
+        run: echo "New commits were found to sync."
+    
+      - name: No new commits
+        if: steps.sync.outputs.has_new_commits == 'false'
+        run: echo "There were no new commits."
